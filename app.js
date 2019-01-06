@@ -16,7 +16,7 @@ let matrix = new Array(PaintBoardSizeY).fill(null).map(() => new Array(PaintBoar
 
 app.get('/', (req, res) => res.sendFile(__dirname + '/index.html'))
 
-app.get('/board', (req, res) => res.send(matrix.map(column => column.map(x => `${x}`).join('')).join('\n')))
+app.get('/board', (req, res) => res.send(matrix.map(row => row.map(x => `${x}`).join('')).join('')))
 
 app.post('/paint', (req, res) => {
   const x = req.body.x

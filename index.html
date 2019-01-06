@@ -1,10 +1,247 @@
-<!DOCTYPE html>
-<html>
-  <head>
+<!doctype html>
+<html class="no-js">
 
-  </head>
-  <body>
-    <h1>绘板</h1>
-    <!-- TODO -->
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1 user-scalable=no">
+  <title>冬日绘板 - 洛谷</title>
+  <link rel="stylesheet" href="https://cdn.luogu.org/css/amazeui.min.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    .about {
+            background: #fff;
+            padding: 40px 0;
+            color: #7f8c8d;
+        }
+
+        .about-color {
+            color: #34495e;
+        }
+
+        .about-title {
+            font-size: 180%;
+            padding: 30px 0 50px 0;
+            text-align: center;
+        }
+
+        .footer p {
+            color: #7f8c8d;
+            margin: 0;
+            padding: 15px 0;
+            text-align: center;
+            background: #2d3e50;
+        }
+
+        .paleitem {
+            margin: 5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            background: #66ccff;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        #palette {
+            padding: 10px;
+            background: #7f7f7f;
+            margin: 10px;
+            width: 500px;
+            color: #fff;
+        }
+
+        .selected {
+            border: #DAA520 3px solid;
+        }
+
+        #canvas-box {
+            width: 830px;
+            height: 430px;
+            overflow: auto;
+        }
+  </style>
+</head>
+
+<body>
+  <header class="am-topbar am-topbar-fixed-top">
+    <div class="am-container">
+      <h1 class="am-topbar-brand">
+        <a href="#">洛谷冬日绘板</a>
+      </h1>
+      <button class="am-topbar-btn am-topbar-toggle am-btn am-btn-sm am-btn-secondary am-show-sm-only" data-am-collapse="{target: '#collapse-head'}"><span
+          class="am-sr-only">导航切换</span> <span class="am-icon-bars"></span></button>
+      <div class="am-collapse am-topbar-collapse" id="collapse-head">
+        <ul class="am-nav am-nav-pills am-topbar-nav">
+        </ul>
+      </div>
+    </div>
+  </header>
+  <div class="about">
+    <div class="am-g am-container">
+      <div class="am-u-lg-12">
+        <h2 class="about-title about-color">洛谷 冬日绘版</h2>
+        <div class="am-g">
+          <div class="am-u-lg-11" id="canvas-box">
+            <canvas width="200" height="100" id='mycanvas'>
+            </canvas>
+          </div>
+          <div class="am-u-lg-12" id='palette'>Loading...</div>
+          <div class="am-u-lg-12" id='zoom-tool'>
+            <button type="button" class="am-btn am-btn-primary am-radius" zoom=1>全部显示</button>
+            <button type="button" class="am-btn am-btn-secondary am-radius" zoom=5>放大5x</button>
+            <button type="button" class="am-btn am-btn-success am-radius" zoom=10>放大10x</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--[if (gte IE 9)|!(IE)]><!-->
+  <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdn.bootcss.com/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <!--<![endif]-->
+  <!--[if lte IE 8 ]>
+<script src="https://libs.baidu.com/jquery/1.11.3/jquery.min.js"></script>
+<script src="https://cdn.staticfile.org/modernizr/2.8.3/modernizr.js"></script>
+<script src="assets/js/amazeui.ie8polyfill.min.js"></script>
+<![endif]-->
+  <script>
+    const socket = io();
+
+    // 显示用的canvas
+    const mycanvas = document.getElementById("mycanvas");
+    // const mycanvas = document.createElement('canvas');
+    const ctx = mycanvas.getContext("2d");
+
+    // 获取数据用的canvas
+    const internalCanvas = document.createElement('canvas');
+    const internalCtx = internalCanvas.getContext("2d");
+    const internalImgData = internalCtx.createImageData(200, 100);
+
+    const colorCode = [
+      { R: 0, G: 0, B: 0 }, // 黑色
+      { R: 255, G: 255, B: 255 },// 白色
+      { R: 128, G: 128, B: 128 } // 灰色
+    ];
+
+    // 默认选择白色
+    let selectedColor = 1;
+
+    // 放大倍率（默认为1）
+    let ratio = 1;
+
+    // 视口所在位置坐标
+    let viewportX = 0;
+    let viewportY = 0;
+
+    // 鼠标所在起始位置
+    let startX = 0;
+    let startY = 0;
+
+    // 视口起始位置坐标
+    let startViewportX = 0;
+    let startViewportY = 0;
+
+    // 是否处于mousedown
+    let isMouseDown = false;
+
+    function updateDisplayCanvas() {
+      // 平滑
+      ctx.mozImageSmoothingEnabled = false;
+      ctx.webkitImageSmoothingEnabled = false;
+      ctx.msImageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(internalCanvas, viewportX, viewportY, 200 / ratio, 100 / ratio, 0, 0, 200, 100);
+    }
+
+    $.get('/board', (str) => {
+      let data = internalImgData.data;
+      for (let i = 0; i < str.length; i++) {
+        data[i * 4] = colorCode[str[i]].R;
+        data[i * 4 + 1] = colorCode[str[i]].G;
+        data[i * 4 + 2] = colorCode[str[i]].B;
+        data[i * 4 + 3] = 255;
+      }
+      internalCtx.putImageData(internalImgData, 0, 0);
+      updateDisplayCanvas();
+    })
+
+    mycanvas.addEventListener('click', (e) => {
+
+    });
+
+    socket.on('matrix_update', (e) => {
+      let data = internalImgData.data;
+      data[e.x * 4 + e.y * 200 * 4] = colorCode[e.color].R;
+      data[e.x * 4 + e.y * 200 * 4 + 1] = colorCode[e.color].G;
+      data[e.x * 4 + e.y * 200 * 4 + 2] = colorCode[e.color].B;
+      internalCtx.putImageData(internalImgData, 0, 0);
+      updateDisplayCanvas();
+    });
+
+    mycanvas.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startViewportX = viewportX;
+      startViewportY = viewportY;
+    });
+
+    mycanvas.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        viewportX = startViewportX - (e.clientX - startX) / ratio;
+        viewportY = startViewportY - (e.clientY - startY) / ratio;
+        updateDisplayCanvas();
+      }
+    });
+
+    mycanvas.addEventListener('mouseup', (e) => {
+      // 视口没有移动则绘制像素点
+      if (startViewportX === viewportX && startViewportY === viewportY) {
+        let data = internalImgData.data;
+        let mouseX = e.clientX - Math.round(mycanvas.getBoundingClientRect().left);
+        let mouseY = e.clientY - Math.round(mycanvas.getBoundingClientRect().top);
+        let x = Math.floor(mouseX / ratio + viewportX);
+        let y = Math.floor(mouseY / ratio + viewportY);
+        data[x * 4 + y * 200 * 4] = colorCode[selectedColor].R;
+        data[x * 4 + y * 200 * 4 + 1] = colorCode[selectedColor].G;
+        data[x * 4 + y * 200 * 4 + 2] = colorCode[selectedColor].B;
+        data[x * 4 + y * 200 * 4 + 3] = 255;
+        internalCtx.putImageData(internalImgData, 0, 0);
+        updateDisplayCanvas();
+        $.post('/paint', { x: x, y: y, color: selectedColor });
+      }
+      // 回归初始状态
+      isMouseDown = false;
+    })
+
+    // 放大5倍
+    $('.am-btn-secondary').click(() => {
+      ratio = 5;
+      viewportX = (200 - 200 / ratio) / 2;
+      viewportY = (100 - 100 / ratio) / 2;
+
+      updateDisplayCanvas();
+    });
+
+    // 放大10倍
+    $('.am-btn-success').click(() => {
+      ratio = 10;
+      viewportX = (200 - 200 / ratio) / 2;
+      viewportY = (100 - 100 / ratio) / 2;
+      updateDisplayCanvas();
+    });
+
+    // 还原大小
+    $('.am-btn-primary').click(() => {
+      ratio = 1;
+      viewportX = 0;
+      viewportY = 0;
+      updateDisplayCanvas();
+    });
+  </script>
+</body>
+
 </html>
