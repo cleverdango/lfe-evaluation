@@ -88,7 +88,11 @@
             <canvas width="200" height="100" id='mycanvas'>
             </canvas>
           </div>
-          <div class="am-u-lg-12" id='palette'>Loading...</div>
+          <div class="am-u-lg-12" id='palette'>
+            <div class="paleitem" data-code="0" style="background: rgb(0, 0, 0);"></div>
+            <div class="paleitem" data-code="1" style="background: rgb(255, 255, 255);"></div>
+            <div class="paleitem" data-code="2" style="background: rgb(170, 170, 170);"></div>
+          </div>
           <div class="am-u-lg-12" id='zoom-tool'>
             <button type="button" class="am-btn am-btn-primary am-radius" zoom=1>全部显示</button>
             <button type="button" class="am-btn am-btn-secondary am-radius" zoom=5>放大5x</button>
@@ -112,7 +116,6 @@
 
     // 显示用的canvas
     const mycanvas = document.getElementById("mycanvas");
-    // const mycanvas = document.createElement('canvas');
     const ctx = mycanvas.getContext("2d");
 
     // 获取数据用的canvas
@@ -123,7 +126,7 @@
     const colorCode = [
       { R: 0, G: 0, B: 0 }, // 黑色
       { R: 255, G: 255, B: 255 },// 白色
-      { R: 128, G: 128, B: 128 } // 灰色
+      { R: 170, G: 170, B: 170 } // 灰色
     ];
 
     // 默认选择白色
@@ -168,10 +171,6 @@
       updateDisplayCanvas();
     })
 
-    mycanvas.addEventListener('click', (e) => {
-
-    });
-
     socket.on('matrix_update', (e) => {
       let data = internalImgData.data;
       data[e.x * 4 + e.y * 200 * 4] = colorCode[e.color].R;
@@ -183,13 +182,16 @@
 
     mycanvas.addEventListener('mousedown', (e) => {
       isMouseDown = true;
+      // 记录初始鼠标位置
       startX = e.clientX;
       startY = e.clientY;
+      // 记录初始视口位置
       startViewportX = viewportX;
       startViewportY = viewportY;
     });
 
     mycanvas.addEventListener('mousemove', (e) => {
+      // 如果鼠标按下则移动视口
       if (isMouseDown) {
         viewportX = startViewportX - (e.clientX - startX) / ratio;
         viewportY = startViewportY - (e.clientY - startY) / ratio;
@@ -222,7 +224,6 @@
       ratio = 5;
       viewportX = (200 - 200 / ratio) / 2;
       viewportY = (100 - 100 / ratio) / 2;
-
       updateDisplayCanvas();
     });
 
@@ -241,6 +242,12 @@
       viewportY = 0;
       updateDisplayCanvas();
     });
+
+    // 切换颜色
+    $('.paleitem').click((e) => {
+      selectedColor = $(e.target).attr('data-code');
+    });
+
   </script>
 </body>
 
