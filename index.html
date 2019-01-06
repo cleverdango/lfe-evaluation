@@ -132,11 +132,23 @@
     // 放大倍率（默认为1）
     let ratio = 1;
 
-    // 视口所在位置
+    // 视口所在位置坐标
     let viewportX = 0;
     let viewportY = 0;
 
+    // 鼠标所在起始位置
+    let startX = 0;
+    let startY = 0;
+
+    // 视口起始位置坐标
+    let startViewportX = 0;
+    let startViewportY = 0;
+
+    // 是否处于mousedown
+    let isMouseDown = false;
+
     function updateDisplayCanvas() {
+      // 平滑
       ctx.mozImageSmoothingEnabled = false;
       ctx.webkitImageSmoothingEnabled = false;
       ctx.msImageSmoothingEnabled = false;
@@ -157,19 +169,7 @@
     })
 
     mycanvas.addEventListener('click', (e) => {
-      let data = internalImgData.data;
-      let mouseX = e.clientX - Math.round(mycanvas.getBoundingClientRect().left);
-      let mouseY = e.clientY - Math.round(mycanvas.getBoundingClientRect().top);
-      let x = Math.floor(mouseX / ratio + viewportX);
-      let y = Math.floor(mouseY / ratio + viewportY);
-      data[x * 4 + y * 200 * 4] = colorCode[selectedColor].R;
-      data[x * 4 + y * 200 * 4 + 1] = colorCode[selectedColor].G;
-      data[x * 4 + y * 200 * 4 + 2] = colorCode[selectedColor].B;
-      data[x * 4 + y * 200 * 4 + 3] = 255;
-      internalCtx.putImageData(internalImgData, 0, 0);
 
-      updateDisplayCanvas();
-      $.post('/paint', { x: x, y: y, color: selectedColor });
     });
 
     socket.on('matrix_update', (e) => {
@@ -180,6 +180,42 @@
       internalCtx.putImageData(internalImgData, 0, 0);
       updateDisplayCanvas();
     });
+
+    mycanvas.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startViewportX = viewportX;
+      startViewportY = viewportY;
+    });
+
+    mycanvas.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        viewportX = startViewportX - (e.clientX - startX) / ratio;
+        viewportY = startViewportY - (e.clientY - startY) / ratio;
+        updateDisplayCanvas();
+      }
+    });
+
+    mycanvas.addEventListener('mouseup', (e) => {
+      // 视口没有移动则绘制像素点
+      if (startViewportX === viewportX && startViewportY === viewportY) {
+        let data = internalImgData.data;
+        let mouseX = e.clientX - Math.round(mycanvas.getBoundingClientRect().left);
+        let mouseY = e.clientY - Math.round(mycanvas.getBoundingClientRect().top);
+        let x = Math.floor(mouseX / ratio + viewportX);
+        let y = Math.floor(mouseY / ratio + viewportY);
+        data[x * 4 + y * 200 * 4] = colorCode[selectedColor].R;
+        data[x * 4 + y * 200 * 4 + 1] = colorCode[selectedColor].G;
+        data[x * 4 + y * 200 * 4 + 2] = colorCode[selectedColor].B;
+        data[x * 4 + y * 200 * 4 + 3] = 255;
+        internalCtx.putImageData(internalImgData, 0, 0);
+        updateDisplayCanvas();
+        $.post('/paint', { x: x, y: y, color: selectedColor });
+      }
+      // 回归初始状态
+      isMouseDown = false;
+    })
 
     // 放大5倍
     $('.am-btn-secondary').click(() => {
