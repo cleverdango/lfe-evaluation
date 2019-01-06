@@ -62,7 +62,7 @@
             height: 430px;
             overflow: auto;
         }
-    </style>
+  </style>
 </head>
 
 <body>
@@ -88,7 +88,6 @@
             <canvas width="200" height="100" id='mycanvas'>
             </canvas>
           </div>
-
           <div class="am-u-lg-12" id='palette'>Loading...</div>
           <div class="am-u-lg-12" id='zoom-tool'>
             <button type="button" class="am-btn am-btn-primary am-radius" zoom=1>全部显示</button>
@@ -108,51 +107,103 @@
 <script src="https://cdn.staticfile.org/modernizr/2.8.3/modernizr.js"></script>
 <script src="assets/js/amazeui.ie8polyfill.min.js"></script>
 <![endif]-->
-
   <script>
     const socket = io();
 
-    const c = document.getElementById("mycanvas");
-    const ctx = c.getContext("2d");
-    const imgData = ctx.createImageData(200, 100);
+    // 显示用的canvas
+    const mycanvas = document.getElementById("mycanvas");
+    // const mycanvas = document.createElement('canvas');
+    const ctx = mycanvas.getContext("2d");
 
-    const colorcode = [
+    // 获取数据用的canvas
+    const internalCanvas = document.createElement('canvas');
+    const internalCtx = internalCanvas.getContext("2d");
+    const internalImgData = internalCtx.createImageData(200, 100);
+
+    const colorCode = [
       { R: 0, G: 0, B: 0 }, // 黑色
       { R: 255, G: 255, B: 255 },// 白色
       { R: 128, G: 128, B: 128 } // 灰色
     ];
 
+    // 默认选择白色
     let selectedColor = 1;
 
+    // 放大倍率（默认为1）
+    let ratio = 1;
+
+    // 视口所在位置
+    let viewportX = 0;
+    let viewportY = 0;
+
+    function updateDisplayCanvas() {
+      ctx.mozImageSmoothingEnabled = false;
+      ctx.webkitImageSmoothingEnabled = false;
+      ctx.msImageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(internalCanvas, viewportX, viewportY, 200 / ratio, 100 / ratio, 0, 0, 200, 100);
+    }
+
     $.get('/board', (str) => {
-      let data = imgData.data;
+      let data = internalImgData.data;
       for (let i = 0; i < str.length; i++) {
-        data[i * 4] = colorcode[str[i]].R;
-        data[i * 4 + 1] = colorcode[str[i]].G;
-        data[i * 4 + 2] = colorcode[str[i]].B;
+        data[i * 4] = colorCode[str[i]].R;
+        data[i * 4 + 1] = colorCode[str[i]].G;
+        data[i * 4 + 2] = colorCode[str[i]].B;
         data[i * 4 + 3] = 255;
       }
-      ctx.putImageData(imgData, 0, 0);
-    });
+      internalCtx.putImageData(internalImgData, 0, 0);
+      updateDisplayCanvas();
+    })
 
-    c.addEventListener('click', (e) => {
-      let data = imgData.data;
-      let x = Math.round(e.clientX - c.getBoundingClientRect().left);
-      let y = Math.round(e.clientY - c.getBoundingClientRect().top);
-      data[x * 4 + y * 200 * 4] = colorcode[selectedColor].R;
-      data[x * 4 + y * 200 * 4 + 1] = colorcode[selectedColor].G;
-      data[x * 4 + y * 200 * 4 + 2] = colorcode[selectedColor].B;
+    mycanvas.addEventListener('click', (e) => {
+      let data = internalImgData.data;
+      let mouseX = e.clientX - Math.round(mycanvas.getBoundingClientRect().left);
+      let mouseY = e.clientY - Math.round(mycanvas.getBoundingClientRect().top);
+      let x = Math.floor(mouseX / ratio + viewportX);
+      let y = Math.floor(mouseY / ratio + viewportY);
+      data[x * 4 + y * 200 * 4] = colorCode[selectedColor].R;
+      data[x * 4 + y * 200 * 4 + 1] = colorCode[selectedColor].G;
+      data[x * 4 + y * 200 * 4 + 2] = colorCode[selectedColor].B;
       data[x * 4 + y * 200 * 4 + 3] = 255;
-      ctx.putImageData(imgData, 0, 0);
+      internalCtx.putImageData(internalImgData, 0, 0);
+
+      updateDisplayCanvas();
       $.post('/paint', { x: x, y: y, color: selectedColor });
     });
 
-    socket.on('matrix_update', (event) => {
-      let data = imgData.data;
-      data[event.x * 4 + event.y * 200 * 4] = colorcode[event.color].R;
-      data[event.x * 4 + event.y * 200 * 4 + 1] = colorcode[event.color].G;
-      data[event.x * 4 + event.y * 200 * 4 + 2] = colorcode[event.color].B;
-      ctx.putImageData(imgData, 0, 0);
+    socket.on('matrix_update', (e) => {
+      let data = internalImgData.data;
+      data[e.x * 4 + e.y * 200 * 4] = colorCode[e.color].R;
+      data[e.x * 4 + e.y * 200 * 4 + 1] = colorCode[e.color].G;
+      data[e.x * 4 + e.y * 200 * 4 + 2] = colorCode[e.color].B;
+      internalCtx.putImageData(internalImgData, 0, 0);
+      updateDisplayCanvas();
+    });
+
+    // 放大5倍
+    $('.am-btn-secondary').click(() => {
+      ratio = 5;
+      viewportX = (200 - 200 / ratio) / 2;
+      viewportY = (100 - 100 / ratio) / 2;
+
+      updateDisplayCanvas();
+    });
+
+    // 放大10倍
+    $('.am-btn-success').click(() => {
+      ratio = 10;
+      viewportX = (200 - 200 / ratio) / 2;
+      viewportY = (100 - 100 / ratio) / 2;
+      updateDisplayCanvas();
+    });
+
+    // 还原大小
+    $('.am-btn-primary').click(() => {
+      ratio = 1;
+      viewportX = 0;
+      viewportY = 0;
+      updateDisplayCanvas();
     });
   </script>
 </body>
