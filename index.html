@@ -112,7 +112,6 @@
 
     // 显示用的canvas
     const mycanvas = document.getElementById("mycanvas");
-    // const mycanvas = document.createElement('canvas');
     const ctx = mycanvas.getContext("2d");
 
     // 获取数据用的canvas
@@ -168,10 +167,6 @@
       updateDisplayCanvas();
     })
 
-    mycanvas.addEventListener('click', (e) => {
-
-    });
-
     socket.on('matrix_update', (e) => {
       let data = internalImgData.data;
       data[e.x * 4 + e.y * 200 * 4] = colorCode[e.color].R;
@@ -183,13 +178,16 @@
 
     mycanvas.addEventListener('mousedown', (e) => {
       isMouseDown = true;
+      // 记录初始鼠标位置
       startX = e.clientX;
       startY = e.clientY;
+      // 记录初始视口位置
       startViewportX = viewportX;
       startViewportY = viewportY;
     });
 
     mycanvas.addEventListener('mousemove', (e) => {
+      // 如果鼠标按下则移动视口
       if (isMouseDown) {
         viewportX = startViewportX - (e.clientX - startX) / ratio;
         viewportY = startViewportY - (e.clientY - startY) / ratio;
